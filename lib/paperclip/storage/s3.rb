@@ -248,7 +248,7 @@ module Paperclip
       end
 
       def s3_bucket
-        @s3_bucket ||= s3_interface.buckets[bucket_name]
+        s3_interface.buckets[bucket_name]
       end
 
       def s3_object style_name = default_style
