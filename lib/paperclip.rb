@@ -58,6 +58,8 @@ require 'paperclip/filename_cleaner'
 require 'mime/types'
 require 'logger'
 require 'cocaine'
+require 'mimemagic'
+require 'mimemagic/overlay'
 
 require 'paperclip/railtie' if defined?(Rails)
 

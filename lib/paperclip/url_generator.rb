@@ -8,15 +8,22 @@ module Paperclip
     end
 
     def for(style_name, options)
-      escape_url_as_needed(
-        timestamp_as_needed(
-          @attachment_options[:interpolator].interpolate(most_appropriate_url, @attachment, style_name),
-          options
-      ), options)
+      run_filter(
+        escape_url_as_needed(
+          timestamp_as_needed(
+            @attachment_options[:interpolator].interpolate(most_appropriate_url, @attachment, style_name),
+            options
+          ), options
+        ), options
+      )
     end
 
     private
 
+    def run_filter(url, options)
+      return url if @attachment.original_filename.nil?
+      options[:url_filter].call(url, options)
+    end
     # This method is all over the place.
     def default_url
       if @attachment_options[:default_url].respond_to?(:call)
