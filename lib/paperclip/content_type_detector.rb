@@ -60,7 +60,7 @@ module Paperclip
     end
 
     def type_from_file_contents
-      type_from_mime_magic || type_from_file_command
+      type_from_mime_magic || certificate_type || type_from_file_command
     rescue Errno::ENOENT => e
       Paperclip.log("Error while determining content type: #{e}")
       SENSIBLE_DEFAULT
@@ -74,6 +74,12 @@ module Paperclip
     def type_from_mime_magic
       @type_from_mime_magic ||=
         MimeMagic.by_magic(File.open(@filename)).try(:type)
+    end
+
+    def certificate_type
+      OpenSSL::X509::Certificate.new(File.read(@filename))
+      'application/x-x509-ca-cert'
+    rescue StandardError
     end
   end
 end
