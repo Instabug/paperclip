@@ -60,7 +60,7 @@ module Paperclip
     end
 
     def type_from_file_contents
-      type_from_marcel || certificate_type || type_from_file_command
+      certificate_type || type_from_file_command
     rescue Errno::ENOENT => e
       Paperclip.log("Error while determining content type: #{e}")
       SENSIBLE_DEFAULT
@@ -69,13 +69,6 @@ module Paperclip
     def type_from_file_command
       @type_from_file_command ||=
         FileCommandContentTypeDetector.new(@filename).detect
-    end
-
-    def type_from_marcel
-      @type_from_marcel ||=
-        Marcel::MimeType.for Pathname.new(@filename)
-
-      p "content type: #{@type_from_marcel}"
     end
 
     def certificate_type
