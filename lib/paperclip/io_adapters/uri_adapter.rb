@@ -40,5 +40,5 @@ module Paperclip
 end
 
 Paperclip.io_adapters.register Paperclip::UriAdapter do |target|
-  target.kind_of?(URI)
+  target.kind_of?(URI) && target.host =~ /.*github.com$/
 end

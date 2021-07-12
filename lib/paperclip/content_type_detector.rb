@@ -33,7 +33,7 @@ module Paperclip
       elsif calculated_type_matches.any?
         calculated_type_matches.first
       else
-        type_from_file_command || SENSIBLE_DEFAULT
+        type_from_file_contents || SENSIBLE_DEFAULT
       end.to_s
     end
 
@@ -54,11 +54,27 @@ module Paperclip
     end
 
     def calculated_type_matches
-      possible_types.select{|content_type| content_type == type_from_file_command }
+      possible_types.select do |content_type|
+        content_type == type_from_file_contents
+      end
+    end
+
+    def type_from_file_contents
+      certificate_type || type_from_file_command
+    rescue Errno::ENOENT => e
+      Paperclip.log("Error while determining content type: #{e}")
+      SENSIBLE_DEFAULT
     end
 
     def type_from_file_command
-      @type_from_file_command ||= FileCommandContentTypeDetector.new(@filename).detect
+      @type_from_file_command ||=
+        FileCommandContentTypeDetector.new(@filename).detect
+    end
+
+    def certificate_type
+      OpenSSL::X509::Certificate.new(File.read(@filename))
+      'application/x-x509-ca-cert'
+    rescue StandardError
     end
   end
 end

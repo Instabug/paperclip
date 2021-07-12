@@ -10,6 +10,6 @@ module Paperclip
   end
 end
 
-Paperclip.io_adapters.register Paperclip::HttpUrlProxyAdapter do |target|
-  String === target && target =~ Paperclip::HttpUrlProxyAdapter::REGEXP
-end
+# Paperclip.io_adapters.register Paperclip::HttpUrlProxyAdapter do |target|
+#   String === target && target =~ Paperclip::HttpUrlProxyAdapter::REGEXP
+# end

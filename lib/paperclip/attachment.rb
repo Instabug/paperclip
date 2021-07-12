@@ -147,7 +147,8 @@ module Paperclip
     def default_options
       {
         :timestamp => @options[:use_timestamp],
-        :escape => @options[:escape_url]
+        :escape => @options[:escape_url],
+        :url_filter => Paperclip.options[:url_filter]
       }
     end
 
