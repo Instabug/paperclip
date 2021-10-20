@@ -65,7 +65,7 @@ module Paperclip
     end
 
     def escape_url(url)
-      (url.respond_to?(:escape) ? url.escape : CGI.escape(url)).gsub(/(\/.+)\?(.+\.)/, '\1%3F\2').gsub(/\(/, '%28').gsub(/\)/, '%29').gsub(/\[/, '%5B').gsub(/\]/, '%5D')
+      (url.respond_to?(:escape) ? url.escape : Addressable::URI.escape(url))
     end
   end
 end
