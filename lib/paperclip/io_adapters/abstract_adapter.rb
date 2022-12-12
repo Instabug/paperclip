@@ -15,6 +15,10 @@ module Paperclip
       @tempfile.read(length, buffer)
     end
 
+    def size
+      @tempfile.size if @tempfile
+    end
+
     def inspect
       "#{self.class}: #{self.original_filename}"
     end

@@ -339,6 +339,7 @@ module Paperclip
               :acl => acl
             }
 
+            write_options[:content_length] = file.size unless file.size.nil?
             # add storage class for this style if defined
             storage_class = s3_storage_class(style)
             write_options.merge!(:storage_class => storage_class) if storage_class
