@@ -79,7 +79,8 @@ module Paperclip
     end
 
     def add_required_validations
-      if @options[:validate_media_type] != false
+      options = Paperclip::Attachment.default_options.deep_merge(@options)
+      if options[:validate_media_type] != false
         name = @name
         @klass.validates_media_type_spoof_detection name,
           :if => ->(instance){ instance.send(name).dirty? }
@@ -90,7 +91,13 @@ module Paperclip
       name = @name
       @klass.send(:after_save) { send(name).send(:save) }
       @klass.send(:before_destroy) { send(name).send(:queue_all_for_delete) }
-      @klass.send(:after_commit, :on => :destroy) { send(name).send(:flush_deletes) }
+      if @klass.respond_to?(:after_commit)
+        @klass.send(:after_commit, on: :destroy) do
+          send(name).send(:flush_deletes)
+        end
+      else
+        @klass.send(:after_destroy) { send(name).send(:flush_deletes) }
+      end
     end
 
     def add_paperclip_callbacks

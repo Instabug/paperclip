@@ -4,11 +4,24 @@ module Paperclip
   class AbstractAdapter
     OS_RESTRICTED_CHARACTERS = %r{[/:]}
 
-    attr_reader :content_type, :original_filename, :size
-    delegate :binmode, :binmode?, :close, :close!, :closed?, :eof?, :path, :rewind, :unlink, :to => :@tempfile
+    attr_reader :content_type, :original_filename, :size, :tempfile
+    delegate :binmode, :binmode?, :close, :close!, :closed?, :eof?, :path, :readbyte, :rewind, :unlink, :to => :@tempfile
+    alias :length :size
+
+    def initialize(target, options = {})
+      @target = target
+      @options = options
+    end
 
     def fingerprint
-      @fingerprint ||= Digest::MD5.file(path).to_s
+      @fingerprint ||= begin
+        digest = @options.fetch(:hash_digest).new
+        File.open(path, "rb") do |f|
+          buf = ""
+          digest.update(buf) while f.read(16384, buf)
+        end
+        digest.hexdigest
+      end
     end
 
     def read(length = nil, buffer = nil)
@@ -43,8 +56,23 @@ module Paperclip
     end
 
     def copy_to_tempfile(src)
-      FileUtils.cp(src.path, destination.path)
+      link_or_copy_file(src.path, destination.path)
       destination
+    end
+
+    def link_or_copy_file(src, dest)
+      begin
+        Paperclip.log("Trying to link #{src} to #{dest}")
+        FileUtils.ln(src, dest, force: true) # overwrite existing
+      rescue Errno::EXDEV, Errno::EPERM, Errno::ENOENT, Errno::EEXIST => e
+        Paperclip.log(
+          "Link failed with #{e.message}; copying link #{src} to #{dest}"
+        )
+        FileUtils.cp(src, dest)
+      end
+
+      @destination.close
+      @destination.open.binmode
     end
   end
 end

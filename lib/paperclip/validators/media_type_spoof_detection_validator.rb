@@ -5,8 +5,12 @@ module Paperclip
     class MediaTypeSpoofDetectionValidator < ActiveModel::EachValidator
       def validate_each(record, attribute, value)
         adapter = Paperclip.io_adapters.for(value)
-        if Paperclip::MediaTypeSpoofDetector.using(adapter, value.original_filename).spoofed?
+        if Paperclip::MediaTypeSpoofDetector.using(adapter, value.original_filename, value.content_type).spoofed?
           record.errors.add(attribute, :spoofed_media_type)
+        end
+
+        if adapter.tempfile
+          adapter.tempfile.close(true)
         end
       end
     end

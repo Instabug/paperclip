@@ -3,6 +3,7 @@ require 'spec_helper'
 describe Paperclip::Validators do
   context "using the helper" do
     before do
+      rebuild_class
       Dummy.validates_attachment :avatar, presence: true, content_type: { content_type: "image/jpeg" }, size: { in: 0..10240 }
     end
 
@@ -30,8 +31,8 @@ describe Paperclip::Validators do
     before do
       rebuild_class
       Dummy.validates_attachment :avatar, file_type_ignorance: true, file_name: [
-          { matches: /\A.*\.jpe?g\Z/i, message: :invalid_extension },
-          { matches: /\A.{,8}\..+\Z/i, message: [:too_long, count: 8] },
+          { matches: /\A.*\.jpe?g\z/i, message: :invalid_extension },
+          { matches: /\A.{,8}\..+\z/i, message: [:too_long, count: 8] },
       ]
     end
 
@@ -64,12 +65,11 @@ describe Paperclip::Validators do
       assert_raises(RuntimeError){ dummy.valid? }
     end
 
-    it 'allows you to attach a file that does not violates these validations' do
+    it 'allows you to attach a file that does not violate these validations' do
       dummy = Dummy.new(avatar: File.new(fixture_file('rotated.jpg')))
-      expect(dummy.errors.keys).to match_array []
+      expect(dummy.errors.full_messages).to be_empty
       assert dummy.valid?
     end
-
   end
 
   context "using the helper with a conditional" do

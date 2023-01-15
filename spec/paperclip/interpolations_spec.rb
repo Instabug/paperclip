@@ -24,15 +24,16 @@ describe Paperclip::Interpolations do
   end
 
   it "returns the class of the instance" do
+    class Thing ; end
     attachment = mock
     attachment.expects(:instance).returns(attachment)
-    attachment.expects(:class).returns("Thing")
+    attachment.expects(:class).returns(Thing)
     assert_equal "things", Paperclip::Interpolations.class(attachment, :style)
   end
 
   it "returns the basename of the file" do
     attachment = mock
-    attachment.expects(:original_filename).returns("one.jpg").times(2)
+    attachment.expects(:original_filename).returns("one.jpg").times(1)
     assert_equal "one", Paperclip::Interpolations.basename(attachment, :style)
   end
 
@@ -138,14 +139,16 @@ describe Paperclip::Interpolations do
     assert_equal "000/000/023", Paperclip::Interpolations.id_partition(attachment, :style)
   end
 
-  it "returns the partitioned id of the attachment when the id is a short string" do
+  it "returns the partitioned id when the id is above 999_999_999" do
     attachment = mock
-    attachment.expects(:id).returns("fnj23")
+    attachment.expects(:id).
+      returns(Paperclip::Interpolations::ID_PARTITION_LIMIT)
     attachment.expects(:instance).returns(attachment)
-    assert_equal "000/0fn/j23", Paperclip::Interpolations.id_partition(attachment, :style)
+    assert_equal "001/000/000/000",
+      Paperclip::Interpolations.id_partition(attachment, :style)
   end
 
-  it "returns the partitioned id of the attachment when the id is a long string" do
+  it "returns the partitioned id of the attachment when the id is a string" do
     attachment = mock
     attachment.expects(:id).returns("32fnj23oio2f")
     attachment.expects(:instance).returns(attachment)
@@ -194,14 +197,14 @@ describe Paperclip::Interpolations do
   it "returns the filename as basename.extension" do
     attachment = mock
     attachment.expects(:styles).returns({})
-    attachment.expects(:original_filename).returns("one.jpg").times(3)
+    attachment.expects(:original_filename).returns("one.jpg").times(2)
     assert_equal "one.jpg", Paperclip::Interpolations.filename(attachment, :style)
   end
 
   it "returns the filename as basename.extension when format supplied" do
     attachment = mock
     attachment.expects(:styles).returns({style: {format: :png}})
-    attachment.expects(:original_filename).returns("one.jpg").times(2)
+    attachment.expects(:original_filename).returns("one.jpg").times(1)
     assert_equal "one.png", Paperclip::Interpolations.filename(attachment, :style)
   end
 
@@ -211,7 +214,7 @@ describe Paperclip::Interpolations do
     attachment.stubs(:original_filename).returns("one")
     assert_equal "one", Paperclip::Interpolations.filename(attachment, :style)
   end
-
+  
   it "returns the basename when the extension contains regexp special characters" do
     attachment = mock
     attachment.stubs(:styles).returns({})
@@ -255,5 +258,14 @@ describe Paperclip::Interpolations do
     Paperclip::Interpolations.expects(:notreal).never
     value = Paperclip::Interpolations.interpolate(":notreal/:id/:attachment", :attachment, :style)
     assert_equal ":notreal/1234/attachments", value
+  end
+
+  it "handles question marks" do
+    Paperclip.interpolates :foo? do
+      "bar"
+    end
+    Paperclip::Interpolations.expects(:fool).never
+    value = Paperclip::Interpolations.interpolate(":fo/:foo?")
+    assert_equal ":fo/bar", value
   end
 end

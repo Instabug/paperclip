@@ -1,38 +1,6 @@
 require 'spec_helper'
 
 describe Paperclip::Thumbnail do
-  context "A Paperclip Tempfile" do
-    before do
-      @tempfile = Paperclip::Tempfile.new(["file", ".jpg"])
-    end
-
-    after { @tempfile.close }
-
-    it "has its path contain a real extension" do
-      assert_equal ".jpg", File.extname(@tempfile.path)
-    end
-
-    it "is a real Tempfile" do
-      assert @tempfile.is_a?(::Tempfile)
-    end
-  end
-
-  context "Another Paperclip Tempfile" do
-    before do
-      @tempfile = Paperclip::Tempfile.new("file")
-    end
-
-    after { @tempfile.close }
-
-    it "does not have an extension if not given one" do
-      assert_equal "", File.extname(@tempfile.path)
-    end
-
-    it "is a real Tempfile" do
-      assert @tempfile.is_a?(::Tempfile)
-    end
-  end
-
   context "An image" do
     before do
       @file = File.new(fixture_file("5k.png"), 'rb')
@@ -80,7 +48,7 @@ describe Paperclip::Thumbnail do
       it "lets us know when a command isn't found versus a processing error" do
         old_path = ENV['PATH']
         begin
-          Cocaine::CommandLine.path = ''
+          Terrapin::CommandLine.path = ''
           Paperclip.options[:command_path] = ''
           ENV['PATH'] = ''
           assert_raises(Paperclip::Errors::CommandNotFoundError) do
@@ -134,7 +102,7 @@ describe Paperclip::Thumbnail do
 
       output_file = thumb.make
 
-      command = Cocaine::CommandLine.new("identify", "-format %wx%h :file")
+      command = Terrapin::CommandLine.new("identify", "-format %wx%h :file")
       assert_equal "50x50", command.run(file: output_file.path).strip
     end
 
@@ -211,17 +179,19 @@ describe Paperclip::Thumbnail do
         end
 
         it "errors when trying to create the thumbnail" do
-          assert_raises(Paperclip::Error) do
-            silence_stream(STDERR) do
+          silence_stream(STDERR) do
+            expect {
               @thumb.make
-            end
+            }.to raise_error(
+              Paperclip::Error, /unrecognized option `-this-aint-no-option'/
+            )
           end
         end
 
         it "lets us know when a command isn't found versus a processing error" do
           old_path = ENV['PATH']
           begin
-            Cocaine::CommandLine.path = ''
+            Terrapin::CommandLine.path = ''
             Paperclip.options[:command_path] = ''
             ENV['PATH'] = ''
             assert_raises(Paperclip::Errors::CommandNotFoundError) do
@@ -479,6 +449,57 @@ describe Paperclip::Thumbnail do
         cmd = %Q[identify -format "%wx%h" "#{dst.path}"]
         assert_equal "50x50", `#{cmd}`.chomp
       end
+    end
+
+    context "with a specified frame_index" do
+      before do
+        @thumb = Paperclip::Thumbnail.new(
+          @file,
+          geometry: "50x50",
+          frame_index: 5,
+          format: :jpg,
+        )
+      end
+
+      it "creates the thumbnail from the frame index when sent #make" do
+        @thumb.make
+        assert_equal 5, @thumb.frame_index
+      end
+    end
+
+    context "with a specified frame_index out of bounds" do
+      before do
+        @thumb = Paperclip::Thumbnail.new(
+          @file,
+          geometry: "50x50",
+          frame_index: 20,
+          format: :jpg,
+        )
+      end
+
+      it "errors when trying to create the thumbnail" do
+        assert_raises(Paperclip::Error) do
+          silence_stream(STDERR) do
+            @thumb.make
+          end
+        end
+      end
+    end
+  end
+
+  context "with a really long file name" do
+    before do
+      tempfile = Tempfile.new("f")
+      tempfile_additional_chars = tempfile.path.split("/")[-1].length + 15
+      image_file = File.new(fixture_file("5k.png"), "rb")
+      @file = Tempfile.new("f" * (255 - tempfile_additional_chars))
+      @file.write(image_file.read)
+      @file.rewind
+    end
+
+    it "does not throw Errno::ENAMETOOLONG" do
+      thumb = Paperclip::Thumbnail.new(@file, geometry: "50x50", format: :gif)
+      expect { thumb.make }.to_not raise_error
     end
   end
 end

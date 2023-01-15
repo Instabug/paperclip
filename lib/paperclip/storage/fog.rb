@@ -19,7 +19,7 @@ module Paperclip
     #   store your files.  Remember that the bucket must be unique across
     #   all of Amazon S3. If the bucket does not exist, Paperclip will
     #   attempt to create it.
-    # * +fog_file*: This can be hash or lambda returning hash. The
+    # * +fog_file+: This can be hash or lambda returning hash. The
     #   value is used as base properties for new uploaded file.
     # * +path+: This is the key under the bucket in which the file will
     #   be stored. The URL will be constructed from the bucket and the
@@ -33,6 +33,10 @@ module Paperclip
     #   that is the alias to the S3 domain of your bucket, e.g.
     #   'http://images.example.com'. This can also be used in
     #   conjunction with Cloudfront (http://aws.amazon.com/cloudfront)
+    # * +fog_options+: (optional) A hash of options that are passed
+    #   to fog when the file is created. For example, you could set
+    #   the multipart-chunk size to 100MB with a hash:
+    #     { :multipart_chunk_size => 104857600 }
 
     module Fog
       def self.extended base
@@ -44,7 +48,7 @@ module Paperclip
         end unless defined?(Fog)
 
         base.instance_eval do
-          unless @options[:url].to_s.match(/\A:fog.*url\Z/)
+          unless @options[:url].to_s.match(/\A:fog.*url\z/)
             @options[:path]  = @options[:path].gsub(/:url/, @options[:url]).gsub(/\A:rails_root\/public\/system\//, '')
             @options[:url]   = ':fog_public_url'
           end
@@ -54,7 +58,7 @@ module Paperclip
         end
       end
 
-      AWS_BUCKET_SUBDOMAIN_RESTRICTON_REGEX = /\A(?:[a-z]|\d(?!\d{0,2}(?:\.\d{1,3}){3}\Z))(?:[a-z0-9]|\.(?![\.\-])|\-(?![\.])){1,61}[a-z0-9]\Z/
+      AWS_BUCKET_SUBDOMAIN_RESTRICTON_REGEX = /\A(?:[a-z]|\d(?!\d{0,2}(?:\.\d{1,3}){3}\z))(?:[a-z0-9]|\.(?![\.\-])|\-(?![\.])){1,61}[a-z0-9]\z/
 
       def exists?(style = default_style)
         if original_filename
@@ -82,11 +86,14 @@ module Paperclip
       end
 
       def fog_public(style = default_style)
-        if @options.has_key?(:fog_public)
-          if @options[:fog_public].respond_to?(:has_key?) && @options[:fog_public].has_key?(style)
-            @options[:fog_public][style]
+        if @options.key?(:fog_public)
+          value = @options[:fog_public]
+          if value.respond_to?(:key?) && value.key?(style)
+            value[style]
+          elsif value.respond_to?(:call)
+            value.call(self)
           else
-            @options[:fog_public]
+            value
           end
         else
           true
@@ -98,16 +105,19 @@ module Paperclip
           log("saving #{path(style)}")
           retried = false
           begin
-            directory.files.create(fog_file.merge(
+            attributes = fog_file.merge(
               :body         => file,
               :key          => path(style),
               :public       => fog_public(style),
               :content_type => file.content_type
-            ))
+            )
+            attributes.merge!(@options[:fog_options]) if @options[:fog_options]
+            directory.files.create(attributes)
           rescue Excon::Errors::NotFound
             raise if retried
             retried = true
             directory.save
+            file.rewind
             retry
           ensure
             file.rewind
@@ -141,8 +151,9 @@ module Paperclip
 
       def expiring_url(time = (Time.now + 3600), style_name = default_style)
         time = convert_time(time)
-        if path(style_name) && directory.files.respond_to?(:get_http_url)
-          expiring_url = directory.files.get_http_url(path(style_name), time)
+        http_url_method = "get_#{scheme}_url"
+        if path(style_name) && directory.files.respond_to?(http_url_method)
+          expiring_url = directory.files.public_send(http_url_method, path(style_name), time)
 
           if @options[:fog_host]
             expiring_url.gsub!(/#{host_name_for_directory}/, dynamic_fog_host_for_style(style_name))
@@ -156,14 +167,14 @@ module Paperclip
 
       def parse_credentials(creds)
         creds = find_credentials(creds).stringify_keys
-        env = Object.const_defined?(:Rails) ? Rails.env : nil
-        (creds[env] || creds).symbolize_keys
+        (creds[RailsEnvironment.get] || creds).symbolize_keys
       end
 
       def copy_to_local_file(style, local_dest_path)
         log("copying #{path(style)} to local file #{local_dest_path}")
         ::File.open(local_dest_path, 'wb') do |local_file|
           file = directory.files.get(path(style))
+          return false unless file
           local_file.write(file.body)
         end
       rescue ::Fog::Errors::Error => e
@@ -174,7 +185,7 @@ module Paperclip
       private
 
       def convert_time(time)
-        if time.is_a?(Fixnum)
+        if time.is_a?(Integer)
           time = Time.now + time
         end
         time
@@ -189,10 +200,10 @@ module Paperclip
       end
 
       def host_name_for_directory
-        if @options[:fog_directory].to_s =~ Fog::AWS_BUCKET_SUBDOMAIN_RESTRICTON_REGEX
-          "#{@options[:fog_directory]}.s3.amazonaws.com"
+        if directory_name.to_s =~ Fog::AWS_BUCKET_SUBDOMAIN_RESTRICTON_REGEX
+          "#{directory_name}.s3.amazonaws.com"
         else
-          "s3.amazonaws.com/#{@options[:fog_directory]}"
+          "s3.amazonaws.com/#{directory_name}"
         end
       end
 
@@ -218,13 +229,15 @@ module Paperclip
       end
 
       def directory
-        dir = if @options[:fog_directory].respond_to?(:call)
+        @directory ||= connection.directories.new(key: directory_name)
+      end
+
+      def directory_name
+        if @options[:fog_directory].respond_to?(:call)
           @options[:fog_directory].call(self)
         else
           @options[:fog_directory]
         end
-
-        @directory ||= connection.directories.new(:key => dir)
       end
 
       def scheme

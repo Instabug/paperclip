@@ -2,7 +2,7 @@ module Paperclip
   class ContentTypeDetector
     # The content-type detection strategy is as follows:
     #
-    # 1. Blank/Empty files: If there's no filename or the file is empty,
+    # 1. Blank/Empty files: If there's no filepath or the file is empty,
     #    provide a sensible default (application/octet-stream or inode/x-empty)
     #
     # 2. Calculated match: Return the first result that is found by both the
@@ -20,8 +20,8 @@ module Paperclip
     EMPTY_TYPE = "inode/x-empty"
     SENSIBLE_DEFAULT = "application/octet-stream"
 
-    def initialize(filename)
-      @filename = filename
+    def initialize(filepath)
+      @filepath = filepath
     end
 
     # Returns a String describing the file's content type
@@ -39,18 +39,18 @@ module Paperclip
 
     private
 
+    def blank_name?
+      @filepath.nil? || @filepath.empty?
+    end
+
     def empty_file?
-      File.exist?(@filename) && File.size(@filename) == 0
+      File.exist?(@filepath) && File.size(@filepath) == 0
     end
 
     alias :empty? :empty_file?
 
-    def blank_name?
-      @filename.nil? || @filename.empty?
-    end
-
     def possible_types
-      MIME::Types.type_for(@filename).collect(&:content_type)
+      MIME::Types.type_for(@filepath).collect(&:content_type)
     end
 
     def calculated_type_matches
@@ -68,11 +68,11 @@ module Paperclip
 
     def type_from_file_command
       @type_from_file_command ||=
-        FileCommandContentTypeDetector.new(@filename).detect
+        FileCommandContentTypeDetector.new(@filepath).detect
     end
 
     def certificate_type
-      OpenSSL::X509::Certificate.new(File.read(@filename))
+      OpenSSL::X509::Certificate.new(File.read(@filepath))
       'application/x-x509-ca-cert'
     rescue StandardError
     end

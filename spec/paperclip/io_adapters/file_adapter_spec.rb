@@ -15,7 +15,7 @@ describe Paperclip::FileAdapter do
 
       context 'doing normal things' do
         before do
-          @subject = Paperclip.io_adapters.for(@file)
+          @subject = Paperclip.io_adapters.for(@file, hash_digest: Digest::MD5)
         end
 
         it 'uses the original filename to generate the tempfile' do
@@ -61,7 +61,7 @@ describe Paperclip::FileAdapter do
       context "file with multiple possible content type" do
         before do
           MIME::Types.stubs(:type_for).returns([MIME::Type.new('image/x-png'), MIME::Type.new('image/png')])
-          @subject = Paperclip.io_adapters.for(@file)
+          @subject = Paperclip.io_adapters.for(@file, hash_digest: Digest::MD5)
         end
 
         it "prefers officially registered mime type" do
@@ -73,10 +73,13 @@ describe Paperclip::FileAdapter do
         end
       end
 
-      context "file with content type derived from file command on *nix" do
+      context "file with content type derived from file contents on *nix" do
         before do
           MIME::Types.stubs(:type_for).returns([])
           Paperclip.stubs(:run).returns("application/vnd.ms-office\n")
+          Paperclip::ContentTypeDetector.any_instance
+            .stubs(:type_from_mime_magic).returns("application/vnd.ms-office")
+
           @subject = Paperclip.io_adapters.for(@file)
         end
 

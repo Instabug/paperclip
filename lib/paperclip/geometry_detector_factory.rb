@@ -17,16 +17,16 @@ module Paperclip
         orientation = Paperclip.options[:use_exif_orientation] ?
           "%[exif:orientation]" : "1"
         Paperclip.run(
-          "identify",
+          Paperclip.options[:is_windows] ? "magick identify" : "identify",
           "-format '%wx%h,#{orientation}' :file", {
             :file => "#{path}[0]"
           }, {
             :swallow_stderr => true
           }
         )
-      rescue Cocaine::ExitStatusError
+      rescue Terrapin::ExitStatusError
         ""
-      rescue Cocaine::CommandNotFoundError => e
+      rescue Terrapin::CommandNotFoundError => e
         raise_because_imagemagick_missing
       end
     end

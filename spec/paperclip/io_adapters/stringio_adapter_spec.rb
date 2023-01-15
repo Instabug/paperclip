@@ -5,7 +5,7 @@ describe Paperclip::StringioAdapter do
     before do
       @contents = "abc123"
       @stringio = StringIO.new(@contents)
-      @subject = Paperclip.io_adapters.for(@stringio)
+      @subject = Paperclip.io_adapters.for(@stringio, hash_digest: Digest::MD5)
     end
 
     it "returns a file name" do
@@ -18,6 +18,10 @@ describe Paperclip::StringioAdapter do
 
     it "returns the size of the data" do
       assert_equal 6, @subject.size
+    end
+
+    it "returns the length of the data" do
+      assert_equal 6, @subject.length
     end
 
     it "generates an MD5 hash of the contents" do

@@ -1,5 +1,6 @@
 require 'spec_helper'
-require 'fog'
+require 'fog/aws'
+require 'fog/local'
 require 'timecop'
 
 describe Paperclip::Storage::Fog do
@@ -182,6 +183,13 @@ describe Paperclip::Storage::Fog do
         tempfile.close
       end
 
+      it 'is able to be handled when missing while copying to a local file' do
+        tempfile = Tempfile.new("known_location")
+        tempfile.binmode
+        assert_equal false, @dummy.avatar.copy_to_local_file(:original, tempfile.path)
+        tempfile.close
+      end
+
       it "passes the content type to the Fog::Storage::AWS::Files instance" do
         Fog::Storage::AWS::Files.any_instance.expects(:create).with do |hash|
           hash[:content_type]
@@ -197,6 +205,11 @@ describe Paperclip::Storage::Fog do
         it "creates the bucket" do
           assert @dummy.save
           assert @connection.directories.get(@fog_directory)
+        end
+
+        it "sucessfully rewinds the file during bucket creation" do
+          assert @dummy.save
+          expect(Paperclip.io_adapters.for(@dummy.avatar).read.length).to be > 0
         end
       end
 
@@ -265,6 +278,22 @@ describe Paperclip::Storage::Fog do
         end
       end
 
+      context "with fog_public as a proc" do
+        let(:proc) { ->(attachment) { !attachment } }
+
+        before do
+          rebuild_model(@options.merge(fog_public: proc))
+          @dummy = Dummy.new
+          @dummy.avatar = StringIO.new(".")
+          @dummy.save
+        end
+
+        it "sets the @fog_public instance variable to false" do
+          assert_equal proc, @dummy.avatar.instance_variable_get("@options")[:fog_public]
+          assert_equal false, @dummy.avatar.fog_public
+        end
+      end
+
       context "with styles set and fog_public set to false" do
         before do
           rebuild_model(@options.merge(fog_public: false, styles: { medium: "300x300>", thumb: "100x100>" }))
@@ -320,6 +349,9 @@ describe Paperclip::Storage::Fog do
         it "honors the scheme in public url" do
           assert_match(/^http:\/\//, @dummy.avatar.url)
         end
+        it "honors the scheme in expiring url" do
+          assert_match(/^http:\/\//, @dummy.avatar.expiring_url)
+        end
       end
 
       context "with scheme not set" do
@@ -334,15 +366,20 @@ describe Paperclip::Storage::Fog do
         it "provides HTTPS public url" do
           assert_match(/^https:\/\//, @dummy.avatar.url)
         end
+        it "provides HTTPS expiring url" do
+          assert_match(/^https:\/\//, @dummy.avatar.expiring_url)
+        end
       end
 
       context "with a valid bucket name for a subdomain" do
+        before { @dummy.stubs(:new_record?).returns(false) }
+
         it "provides an url in subdomain style" do
           assert_match(/^https:\/\/papercliptests.s3.amazonaws.com\/avatars\/5k.png/, @dummy.avatar.url)
         end
 
         it "provides an url that expires in subdomain style" do
-          assert_match(/^http:\/\/papercliptests.s3.amazonaws.com\/avatars\/5k.png\?AWSAccessKeyId=.+$/, @dummy.avatar.expiring_url)
+          assert_match(/^https:\/\/papercliptests.s3.amazonaws.com\/avatars\/5k.png.+Expires=.+$/, @dummy.avatar.expiring_url)
         end
       end
 
@@ -390,7 +427,7 @@ describe Paperclip::Storage::Fog do
         end
 
         it "provides a url that expires in folder style" do
-          assert_match(/^http:\/\/s3.amazonaws.com\/this_is_invalid\/avatars\/5k.png\?AWSAccessKeyId=.+$/, @dummy.avatar.expiring_url)
+          assert_match(/^https:\/\/s3.amazonaws.com\/this_is_invalid\/avatars\/5k.png.+Expires=.+$/, @dummy.avatar.expiring_url)
         end
 
       end
@@ -409,6 +446,9 @@ describe Paperclip::Storage::Fog do
           assert @connection.directories.get(@dynamic_fog_directory).inspect
         end
 
+        it "provides an url using dynamic bucket name" do
+          assert_match(/^https:\/\/dynamicpaperclip.s3.amazonaws.com\/avatars\/5k.png\?\d*$/, @dummy.avatar.url)
+        end
       end
 
       context "with a proc for the fog_host evaluating a model method" do
@@ -475,6 +515,25 @@ describe Paperclip::Storage::Fog do
           assert_equal @dummy.avatar.fog_credentials, @dynamic_fog_credentials
         end
       end
+
+      context "with custom fog_options" do
+        before do
+          rebuild_model(
+            @options.merge(fog_options: { multipart_chunk_size: 104857600 }),
+          )
+          @dummy = Dummy.new
+          @dummy.avatar = @file
+        end
+
+        it "applies the options to the fog #create call" do
+          files = stub
+          @dummy.avatar.stubs(:directory).returns stub(files: files)
+          files.expects(:create).with(
+            has_entries(multipart_chunk_size: 104857600),
+          )
+          @dummy.save
+        end
+      end
     end
 
   end
@@ -492,6 +551,7 @@ describe Paperclip::Storage::Fog do
       @file = File.new(fixture_file('5k.png'), 'rb')
       @dummy = Dummy.new
       @dummy.avatar = @file
+      @dummy.stubs(:new_record?).returns(false)
     end
 
     after do

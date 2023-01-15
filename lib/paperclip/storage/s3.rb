@@ -3,8 +3,8 @@ module Paperclip
     # Amazon's S3 file hosting service is a scalable, easy place to store files for
     # distribution. You can find out more about it at http://aws.amazon.com/s3
     #
-    # To use Paperclip with S3, include the +aws-sdk+ gem in your Gemfile:
-    #   gem 'aws-sdk'
+    # To use Paperclip with S3, include the +aws-sdk-s3+ gem in your Gemfile:
+    #   gem 'aws-sdk-s3'
     # There are a few S3-specific options for has_attached_file:
     # * +s3_credentials+: Takes a path, a File, a Hash or a Proc. The path (or File) must point
     #   to a YAML file containing the +access_key_id+ and +secret_access_key+ that Amazon
@@ -41,19 +41,18 @@ module Paperclip
     # * +s3_permissions+: This is a String that should be one of the "canned" access
     #   policies that S3 provides (more information can be found here:
     #   http://docs.aws.amazon.com/AmazonS3/latest/dev/ACLOverview.html)
-    #   The default for Paperclip is :public_read.
+    #   The default for Paperclip is public-read.
     #
     #   You can set permission on a per style bases by doing the following:
     #     :s3_permissions => {
-    #       :original => :private
+    #       :original => "private"
     #     }
     #   Or globally:
-    #     :s3_permissions => :private
+    #     :s3_permissions => "private"
     #
-    # * +s3_protocol+: The protocol for the URLs generated to your S3 assets. Can be either
-    #   'http', 'https', or an empty string to generate protocol-relative URLs. Defaults to 'http'
-    #   when your :s3_permissions are :public_read (the default), and 'https' when your
-    #   :s3_permissions are anything else.
+    # * +s3_protocol+: The protocol for the URLs generated to your S3 assets.
+    #   Can be either 'http', 'https', or an empty string to generate
+    #   protocol-relative URLs. Defaults to empty string.
     # * +s3_headers+: A hash of headers or a Proc. You may specify a hash such as
     #   {'Expires' => 1.year.from_now.httpdate}. If you use a Proc, headers are determined at
     #   runtime. Paperclip will call that Proc with attachment as the only argument.
@@ -61,11 +60,14 @@ module Paperclip
     # * +bucket+: This is the name of the S3 bucket that will store your files. Remember
     #   that the bucket must be unique across all of Amazon S3. If the bucket does not exist
     #   Paperclip will attempt to create it. The bucket name will not be interpolated.
-    #   You can define the bucket as a Proc if you want to determine it's name at runtime.
+    #   You can define the bucket as a Proc if you want to determine its name at runtime.
     #   Paperclip will call that Proc with attachment as the only argument.
     # * +s3_host_alias+: The fully-qualified domain name (FQDN) that is the alias to the
     #   S3 domain of your bucket. Used with the :s3_alias_url url interpolation. See the
     #   link in the +url+ entry for more information about S3 domains and buckets.
+    # * +s3_prefixes_in_alias+: The number of prefixes that is prepended by
+    #   s3_host_alias. This will remove the prefixes from the path in
+    #   :s3_alias_url url interpolation
     # * +url+: There are four options for the S3 url. You can choose to have the bucket's name
     #   placed domain-style (bucket.s3.amazonaws.com) or path-style (s3.amazonaws.com/bucket).
     #   You can also specify a CNAME (which requires the CNAME to be specified as
@@ -92,64 +94,52 @@ module Paperclip
     #   to interpolate. Keys should be unique, like filenames, and despite the fact that
     #   S3 (strictly speaking) does not support directories, you can still use a / to
     #   separate parts of your file name.
-    # * +s3_host_name+: If you are using your bucket in Tokyo region etc, write host_name.
+    # * +s3_host_name+: If you are using your bucket in Tokyo region
+    #   etc, write host_name (e.g., 's3-ap-northeast-1.amazonaws.com').
+    # * +s3_region+: For aws-sdk-s3, s3_region is required.
     # * +s3_metadata+: These key/value pairs will be stored with the
     #   object.  This option works by prefixing each key with
     #   "x-amz-meta-" before sending it as a header on the object
     #   upload request. Can be defined both globally and within a style-specific hash.
     # * +s3_storage_class+: If this option is set to
-    #   <tt>:reduced_redundancy</tt>, the object will be stored using Reduced
-    #   Redundancy Storage.  RRS enables customers to reduce their
+    #   <tt>:REDUCED_REDUNDANCY</tt>, the object will be stored using Reduced
+    #   Redundancy Storage. RRS enables customers to reduce their
     #   costs by storing non-critical, reproducible data at lower
     #   levels of redundancy than Amazon S3's standard storage.
+    # * +use_accelerate_endpoint+: Use accelerate endpoint
+    #   http://docs.aws.amazon.com/AmazonS3/latest/dev/transfer-acceleration.html
     #
     #   You can set storage class on a per style bases by doing the following:
     #     :s3_storage_class => {
-    #       :thumb => :reduced_reduncancy
+    #       :thumb => :REDUCED_REDUNDANCY
     #     }
+    #
     #   Or globally:
-    #     :s3_storage_class => :reduced_redundancy
+    #     :s3_storage_class => :REDUCED_REDUNDANCY
+    #
+    #   Other storage classes, such as <tt>:STANDARD_IA</tt>, are also available—see the
+    #   documentation for the <tt>aws-sdk-s3</tt> gem for the full list.
 
     module S3
       def self.extended base
         begin
-          require 'aws-sdk'
+          require "aws-sdk-s3"
         rescue LoadError => e
-          e.message << " (You may need to install the aws-sdk gem)"
+          e.message << " (You may need to install the aws-sdk-s3 gem)"
           raise e
-        end unless defined?(AWS::Core)
-
-        # Overriding log formatter to make sure it return a UTF-8 string
-        if defined?(AWS::Core::LogFormatter)
-          AWS::Core::LogFormatter.class_eval do
-            def summarize_hash(hash)
-              hash.map { |key, value| ":#{key}=>#{summarize_value(value)}".force_encoding('UTF-8') }.sort.join(',')
-            end
-          end
-        elsif defined?(AWS::Core::ClientLogging)
-          AWS::Core::ClientLogging.class_eval do
-            def sanitize_hash(hash)
-              hash.map { |key, value| "#{sanitize_value(key)}=>#{sanitize_value(value)}".force_encoding('UTF-8') }.sort.join(',')
-            end
-          end
         end
 
         base.instance_eval do
           @s3_options     = @options[:s3_options]     || {}
           @s3_permissions = set_permissions(@options[:s3_permissions])
-          @s3_protocol    = @options[:s3_protocol]    ||
-            Proc.new do |style, attachment|
-              permission  = (@s3_permissions[style.to_s.to_sym] || @s3_permissions[:default])
-              permission  = permission.call(attachment, style) if permission.respond_to?(:call)
-              (permission == :public_read) ? 'http' : 'https'
-            end
+          @s3_protocol    = @options[:s3_protocol] || "".freeze
           @s3_metadata = @options[:s3_metadata] || {}
           @s3_headers = {}
           merge_s3_headers(@options[:s3_headers], @s3_headers, @s3_metadata)
 
           @s3_storage_class = set_storage_class(@options[:s3_storage_class])
 
-          @s3_server_side_encryption = :aes256
+          @s3_server_side_encryption = "AES256"
           if @options[:s3_server_side_encryption].blank?
             @s3_server_side_encryption = false
           end
@@ -157,33 +147,44 @@ module Paperclip
             @s3_server_side_encryption = @options[:s3_server_side_encryption]
           end
 
-          unless @options[:url].to_s.match(/\A:s3.*url\Z/) || @options[:url] == ":asset_host"
-            @options[:path] = path_option.gsub(/:url/, @options[:url]).gsub(/\A:rails_root\/public\/system/, '')
-            @options[:url]  = ":s3_path_url"
+          unless @options[:url].to_s.match(/\A:s3.*url\z/) || @options[:url] == ":asset_host".freeze
+            @options[:path] = path_option.gsub(/:url/, @options[:url]).sub(/\A:rails_root\/public\/system/, "".freeze)
+            @options[:url]  = ":s3_path_url".freeze
           end
           @options[:url] = @options[:url].inspect if @options[:url].is_a?(Symbol)
 
           @http_proxy = @options[:http_proxy] || nil
+
+          @use_accelerate_endpoint = @options[:use_accelerate_endpoint]
         end
 
         Paperclip.interpolates(:s3_alias_url) do |attachment, style|
-          "#{attachment.s3_protocol(style, true)}//#{attachment.s3_host_alias}/#{attachment.path(style).gsub(%r{\A/}, "")}"
+          protocol = attachment.s3_protocol(style, true)
+          host = attachment.s3_host_alias
+          path = attachment.path(style).
+            split("/")[attachment.s3_prefixes_in_alias..-1].
+            join("/").
+            sub(%r{\A/}, "".freeze)
+          "#{protocol}//#{host}/#{path}"
         end unless Paperclip::Interpolations.respond_to? :s3_alias_url
         Paperclip.interpolates(:s3_path_url) do |attachment, style|
-          "#{attachment.s3_protocol(style, true)}//#{attachment.s3_host_name}/#{attachment.bucket_name}/#{attachment.path(style).gsub(%r{\A/}, "")}"
+          "#{attachment.s3_protocol(style, true)}//#{attachment.s3_host_name}/#{attachment.bucket_name}/#{attachment.path(style).sub(%r{\A/}, "".freeze)}"
         end unless Paperclip::Interpolations.respond_to? :s3_path_url
         Paperclip.interpolates(:s3_domain_url) do |attachment, style|
-          "#{attachment.s3_protocol(style, true)}//#{attachment.bucket_name}.#{attachment.s3_host_name}/#{attachment.path(style).gsub(%r{\A/}, "")}"
+          "#{attachment.s3_protocol(style, true)}//#{attachment.bucket_name}.#{attachment.s3_host_name}/#{attachment.path(style).sub(%r{\A/}, "".freeze)}"
         end unless Paperclip::Interpolations.respond_to? :s3_domain_url
         Paperclip.interpolates(:asset_host) do |attachment, style|
-          "#{attachment.path(style).gsub(%r{\A/}, "")}"
+          "#{attachment.path(style).sub(%r{\A/}, "".freeze)}"
         end unless Paperclip::Interpolations.respond_to? :asset_host
       end
 
       def expiring_url(time = 3600, style_name = default_style)
         if path(style_name)
-          base_options = { :expires => time, :secure => use_secure_protocol?(style_name) }
-          s3_object(style_name).url_for(:read, base_options.merge(s3_url_options)).to_s
+          base_options = { expires_in: time }
+          s3_object(style_name).presigned_url(
+            :get,
+            base_options.merge(s3_url_options),
+          ).to_s
         else
           url(style_name)
         end
@@ -197,13 +198,24 @@ module Paperclip
         host_name = @options[:s3_host_name]
         host_name = host_name.call(self) if host_name.is_a?(Proc)
 
-        host_name || s3_credentials[:s3_host_name] || "s3.amazonaws.com"
+        host_name || s3_credentials[:s3_host_name] || "s3.amazonaws.com".freeze
+      end
+
+      def s3_region
+        region = @options[:s3_region]
+        region = region.call(self) if region.is_a?(Proc)
+
+        region || s3_credentials[:s3_region]
       end
 
       def s3_host_alias
         @s3_host_alias = @options[:s3_host_alias]
         @s3_host_alias = @s3_host_alias.call(self) if @s3_host_alias.respond_to?(:call)
         @s3_host_alias
+      end
+
+      def s3_prefixes_in_alias
+        @s3_prefixes_in_alias ||= @options[:s3_prefixes_in_alias].to_i
       end
 
       def s3_url_options
@@ -220,7 +232,7 @@ module Paperclip
 
       def s3_interface
         @s3_interface ||= begin
-          config = { :s3_endpoint => s3_host_name }
+          config = { region: s3_region }
 
           if using_http_proxy?
 
@@ -234,7 +246,9 @@ module Paperclip
             config[:proxy_uri] = URI::HTTP.build(proxy_opts)
           end
 
-          [:access_key_id, :secret_access_key, :credential_provider].each do |opt|
+          config[:use_accelerate_endpoint] = use_accelerate_endpoint?
+
+          [:access_key_id, :secret_access_key, :credential_provider, :credentials].each do |opt|
             config[opt] = s3_credentials[opt] if s3_credentials[opt]
           end
 
@@ -244,15 +258,23 @@ module Paperclip
 
       def obtain_s3_instance_for(options)
         instances = (Thread.current[:paperclip_s3_instances] ||= {})
-        instances[options] ||= AWS::S3.new(options)
+        instances[options] ||= ::Aws::S3::Resource.new(options)
       end
 
       def s3_bucket
-        @s3_bucket ||= s3_interface.buckets[bucket_name]
+        @s3_bucket ||= s3_interface.bucket(bucket_name)
+      end
+
+      def style_name_as_path(style_name)
+        path(style_name).sub(%r{\A/},'')
       end
 
       def s3_object style_name = default_style
-        s3_bucket.objects[path(style_name).sub(%r{\A/},'')]
+        s3_bucket.object style_name_as_path(style_name)
+      end
+
+      def use_accelerate_endpoint?
+        !!@use_accelerate_endpoint
       end
 
       def using_http_proxy?
@@ -277,7 +299,7 @@ module Paperclip
 
       def set_permissions permissions
         permissions = { :default => permissions } unless permissions.respond_to?(:merge)
-        permissions.merge :default => (permissions[:default] || :public_read)
+        permissions.merge :default => (permissions[:default] || :"public-read")
       end
 
       def set_storage_class(storage_class)
@@ -286,10 +308,9 @@ module Paperclip
       end
 
       def parse_credentials creds
-        creds = creds.respond_to?('call') ? creds.call(self) : creds
+        creds = creds.respond_to?(:call) ? creds.call(self) : creds
         creds = find_credentials(creds).stringify_keys
-        env = Object.const_defined?(:Rails) ? Rails.env : nil
-        (creds[env] || creds).symbolize_keys
+        (creds[RailsEnvironment.get] || creds).symbolize_keys
       end
 
       def exists?(style = default_style)
@@ -298,7 +319,7 @@ module Paperclip
         else
           false
         end
-      rescue AWS::Errors::Base => e
+      rescue Aws::Errors::ServiceError => e
         false
       end
 
@@ -324,7 +345,7 @@ module Paperclip
       end
 
       def create_bucket
-        s3_interface.buckets.create(bucket_name)
+        s3_interface.bucket(bucket_name).create
       end
 
       def flush_writes #:nodoc:
@@ -332,11 +353,9 @@ module Paperclip
         retries = 0
           begin
             log("saving #{path(style)}")
-            acl = @s3_permissions[style] || @s3_permissions[:default]
-            acl = acl.call(self, style) if acl.respond_to?(:call)
             write_options = {
               :content_type => file.content_type,
-              :acl => acl
+              :acl => s3_permissions(style)
             }
 
             write_options[:content_length] = file.size unless file.size.nil?
@@ -358,11 +377,11 @@ module Paperclip
             write_options[:metadata] = @s3_metadata unless @s3_metadata.empty?
             write_options.merge!(@s3_headers)
 
-            s3_object(style).write(file, write_options)
-          rescue AWS::S3::Errors::NoSuchBucket
+            s3_object(style).upload_file(file.path, write_options)
+          rescue ::Aws::S3::Errors::NoSuchBucket
             create_bucket
             retry
-          rescue AWS::S3::Errors::SlowDown
+          rescue ::Aws::S3::Errors::SlowDown
             retries += 1
             if retries <= 5
               sleep((2 ** retries) * 0.5)
@@ -384,8 +403,8 @@ module Paperclip
         @queued_for_delete.each do |path|
           begin
             log("deleting #{path}")
-            s3_bucket.objects[path.sub(%r{\A/},'')].delete
-          rescue AWS::Errors::Base => e
+            s3_bucket.object(path.sub(%r{\A/}, "")).delete
+          rescue Aws::Errors::ServiceError => e
             # Ignore this.
           end
         end
@@ -395,11 +414,11 @@ module Paperclip
       def copy_to_local_file(style, local_dest_path)
         log("copying #{path(style)} to local file #{local_dest_path}")
         ::File.open(local_dest_path, 'wb') do |local_file|
-          s3_object(style).read do |chunk|
+          s3_object(style).get do |chunk|
             local_file.write(chunk)
           end
         end
-      rescue AWS::Errors::Base => e
+      rescue Aws::Errors::ServiceError => e
         warn("#{e} - cannot copy #{path(style)} to local file #{local_dest_path}")
         false
       end
