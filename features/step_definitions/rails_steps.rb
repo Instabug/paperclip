@@ -13,7 +13,7 @@ Given /^I generate a new rails application$/ do
       gem "jruby-openssl", :platform => :jruby
       gem "capybara"
       gem "gherkin"
-      gem "aws-sdk"
+      gem "aws-sdk-s3"
       gem "racc", :platform => :rbx
       gem "rubysl", :platform => :rbx
       """

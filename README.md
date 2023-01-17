@@ -451,7 +451,7 @@ Storage
 Paperclip ships with 3 storage adapters:
 
 * File Storage
-* S3 Storage (via `aws-sdk`)
+* S3 Storage (via `aws-sdk-s3`)
 * Fog Storage
 
 If you would like to use Paperclip with another storage, you can install these
@@ -479,7 +479,7 @@ You may also choose to store your files using Amazon's S3 service. To do so, inc
 the `aws-sdk` gem in your Gemfile:
 
 ```ruby
-gem 'aws-sdk', '~> 1.5.7'
+gem 'aws-sdk-s3'
 ```
 
 And then you can specify using S3 from `has_attached_file`.

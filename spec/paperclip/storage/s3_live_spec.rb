@@ -8,9 +8,10 @@ unless ENV["S3_BUCKET"].blank?
                       storage: :s3,
                       bucket: ENV["S3_BUCKET"],
                       path: ":class/:attachment/:id/:style.:extension",
+                      s3_region: ENV["S3_REGION"],
                       s3_credentials: {
-                        aws_access_key_id: ENV['AWS_ACCESS_KEY_ID'],
-                        aws_secre_access_key: ENV['AWS_SECRET_ACCESS_KEY']
+                        access_key_id: ENV['AWS_ACCESS_KEY_ID'],
+                        secret_access_key: ENV['AWS_SECRET_ACCESS_KEY']
                       }
 
         @file = File.new(fixture_file("5k.png"))
@@ -45,9 +46,10 @@ unless ENV["S3_BUCKET"].blank?
                       storage: :s3,
                       bucket: ENV["S3_BUCKET"],
                       path: ":class/:attachment/:id/:style.:extension",
+                      s3_region: ENV["S3_REGION"],
                       s3_credentials: {
-                        aws_access_key_id: ENV['AWS_ACCESS_KEY_ID'],
-                        aws_secre_access_key: ENV['AWS_SECRET_ACCESS_KEY']
+                        access_key_id: ENV['AWS_ACCESS_KEY_ID'],
+                        secret_access_key: ENV['AWS_SECRET_ACCESS_KEY']
                       }
 
         @dummy = Dummy.new
@@ -64,9 +66,10 @@ unless ENV["S3_BUCKET"].blank?
                       storage: :s3,
                       bucket: ENV["S3_BUCKET"],
                       path: ":class/:attachment/:id/:style.:extension",
+                      s3_region: ENV["S3_REGION"],
                       s3_credentials: {
-                        aws_access_key_id: ENV['AWS_ACCESS_KEY_ID'],
-                        aws_secre_access_key: ENV['AWS_SECRET_ACCESS_KEY']
+                        access_key_id: ENV['AWS_ACCESS_KEY_ID'],
+                        secret_access_key: ENV['AWS_SECRET_ACCESS_KEY']
                       }
 
         Dummy.delete_all
@@ -105,9 +108,12 @@ unless ENV["S3_BUCKET"].blank?
         rebuild_model styles: { thumb: "100x100", square: "32x32#" },
           storage: :s3,
           bucket: ENV["S3_BUCKET"],
+          s3_region: ENV["S3_REGION"],
+          url: ":s3_domain_url",
+          path: "/:class/:attachment/:id_partition/:style/:filename",
           s3_credentials: {
-            aws_access_key_id: ENV['AWS_ACCESS_KEY_ID'],
-            aws_secre_access_key: ENV['AWS_SECRET_ACCESS_KEY']
+            access_key_id: ENV['AWS_ACCESS_KEY_ID'],
+            secret_access_key: ENV['AWS_SECRET_ACCESS_KEY']
           }
 
         Dummy.delete_all
@@ -136,7 +142,7 @@ unless ENV["S3_BUCKET"].blank?
       it "is destroyable" do
         url = @dummy.avatar.url
         @dummy.destroy
-        assert_not_found_response url
+        assert_forbidden_response url
       end
     end
 
@@ -146,12 +152,12 @@ unless ENV["S3_BUCKET"].blank?
                       storage: :s3,
                       bucket: ENV["S3_BUCKET"],
                       path: ":class/:attachment/:id/:style.:extension",
+                      s3_region: ENV["S3_REGION"],
                       s3_credentials: {
-                        aws_access_key_id: ENV['AWS_ACCESS_KEY_ID'],
-                        aws_secre_access_key: ENV['AWS_SECRET_ACCESS_KEY']
+                        access_key_id: ENV['AWS_ACCESS_KEY_ID'],
+                        secret_access_key: ENV['AWS_SECRET_ACCESS_KEY']
                       },
-                      s3_server_side_encryption: :aes256
-
+                      s3_server_side_encryption: "AES256"
         Dummy.delete_all
         @dummy = Dummy.new
       end
@@ -173,7 +179,7 @@ unless ENV["S3_BUCKET"].blank?
           end
 
           it "is encrypted on S3" do
-            assert @dummy.avatar.s3_object.server_side_encryption == :aes256
+            assert @dummy.avatar.s3_object.server_side_encryption == "AES256"
           end
         end
       end
