@@ -1,10 +1,4 @@
-library identifier: 'utils@jenkins_sharedLib_latest',
-        retriever: modernSCM(
-            [$class: 'GitSCMSource',
-            remote: 'https://github.com/Instabug/ops.git',
-            credentialsId: 'Github',
-            ],
-        )
+@Library('utils@master') _
 
 def app
 def status = 0
