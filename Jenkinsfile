@@ -1,4 +1,4 @@
-@Library('utils@master') _
+@Library('utils') _
 
 // PRs only: SonarQube Analysis, in a pod of its own (podCI.sonar).
 if (env.CHANGE_ID) {
