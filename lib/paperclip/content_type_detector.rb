@@ -60,7 +60,7 @@ module Paperclip
     end
 
     def type_from_file_contents
-      (certificate_type || pkcs8_type || type_from_file_command)
+      type_from_file_command
     rescue Errno::ENOENT => e
       Paperclip.log("Error while determining content type: #{e}")
       SENSIBLE_DEFAULT
@@ -70,17 +70,5 @@ module Paperclip
       @type_from_file_command ||=
         FileCommandContentTypeDetector.new(@filename).detect
     end
-
-    def certificate_type
-      OpenSSL::X509::Certificate.new(File.read(@filename))
-      'application/x-x509-ca-cert'
-    rescue StandardError
-    end
-    
-    def pkcs8_type
-      OpenSSL::PKey.read(File.read(@filename))
-      'application/pkcs8'
-    rescue StandardError
-    end  
   end
 end

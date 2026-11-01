@@ -28,6 +28,18 @@ describe Paperclip::ContentTypeDetector do
     FileUtils.rm @filename
   end
 
+  it 'returns the file command type for a PEM certificate' do
+    assert_equal "text/plain", Paperclip::ContentTypeDetector.new(fixture_file("certificate.pem")).detect
+  end
+
+  it 'returns the file command type for a PEM private key' do
+    tempfile = Tempfile.new(["key", ".p8"])
+    tempfile.write(OpenSSL::PKey::EC.generate("prime256v1").to_pem)
+    tempfile.close
+    assert_equal "text/plain", Paperclip::ContentTypeDetector.new(tempfile.path).detect
+    tempfile.unlink
+  end
+
   it 'returns a sensible default if something is wrong, like the file is gone' do
     @filename = "/path/to/nothing"
     assert_equal "application/octet-stream", Paperclip::ContentTypeDetector.new(@filename).detect
