@@ -29,10 +29,12 @@ describe Paperclip::ContentTypeDetector do
   end
 
   it 'returns the file command type for a PEM certificate' do
+    Paperclip.stubs(:run).returns("text/plain")
     assert_equal "text/plain", Paperclip::ContentTypeDetector.new(fixture_file("certificate.pem")).detect
   end
 
   it 'returns the file command type for a PEM private key' do
+    Paperclip.stubs(:run).returns("text/plain")
     tempfile = Tempfile.new(["key", ".p8"])
     tempfile.write(OpenSSL::PKey::EC.generate("prime256v1").to_pem)
     tempfile.close
