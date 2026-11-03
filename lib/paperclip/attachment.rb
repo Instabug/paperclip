@@ -426,17 +426,17 @@ module Paperclip
 
     def assign_attributes
       @queued_for_write[:original] = @file
-      apply_content_type_detector
+      apply_content_type_detector(@file)
       assign_file_information
       assign_fingerprint(@file.fingerprint)
       assign_timestamps
     end
 
-    def apply_content_type_detector
+    def apply_content_type_detector(file)
       detector = @options[:content_type_detector]
 
       if detector
-        @file.content_type = detector.new(@file.path).detect.presence || @file.content_type
+        file.content_type = detector.new(file.path).detect.presence || file.content_type
       end
     end
 
@@ -537,6 +537,9 @@ module Paperclip
 
         unadapted_file = @queued_for_write[name]
         @queued_for_write[name] = Paperclip.io_adapters.for(@queued_for_write[name])
+        if name == :original
+          apply_content_type_detector(@queued_for_write[name])
+        end
         unadapted_file.close if unadapted_file.respond_to?(:close)
         @queued_for_write[name]
       rescue Paperclip::Error => e
