@@ -9,8 +9,6 @@ module Paperclip
       @tempfile = copy_to_tempfile(@content)
     end
 
-    attr_writer :content_type
-
     private
 
     def download_content

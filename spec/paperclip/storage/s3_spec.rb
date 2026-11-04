@@ -417,6 +417,33 @@ describe Paperclip::Storage::S3 do
     end
   end
 
+  context "An attachment that uses S3 for storage and a content_type_detector" do
+    before do
+      rebuild_model (aws2_add_region).merge storage: :s3,
+        bucket: "bucket",
+        path: ":attachment/:style/:basename:dotextension",
+        s3_credentials: {
+          'access_key_id' => "12345",
+          'secret_access_key' => "54321"
+        },
+        content_type_detector: stub(new: stub(detect: "image/x-custom"))
+
+      @file = File.new(fixture_file('5k.png'), 'rb')
+      @dummy = Dummy.new
+      @dummy.avatar = @file
+    end
+
+    after { @file.close }
+
+    it "uploads the file with the detected content type" do
+      object = stub
+      @dummy.avatar.stubs(:s3_object).with(:original).returns(object)
+      object.expects(:upload_file).with(anything, has_entry(content_type: "image/x-custom"))
+
+      @dummy.save
+    end
+  end
+
   context "An attachment that uses S3 for storage and has styles" do
     before do
       rebuild_model(

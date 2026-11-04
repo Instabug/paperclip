@@ -836,6 +836,53 @@ describe Paperclip::Attachment do
     end
   end
 
+  context "Assigning an attachment with a content_type_detector" do
+    before do
+      @file = File.new(fixture_file("5k.png"), "rb")
+    end
+
+    after { @file.close }
+
+    it "passes the queued file to the detector" do
+      detector = stub
+      detector.expects(:new).with { |path| FileUtils.compare_file(path, @file.path) }.returns(stub(detect: "image/x-custom"))
+      rebuild_model content_type_detector: detector
+      Dummy.new.avatar = @file
+    end
+
+    it "uses the detected type for the content_type field and the queued file" do
+      rebuild_model content_type_detector: stub(new: stub(detect: "image/x-custom"))
+      dummy = Dummy.new
+      dummy.avatar = @file
+
+      assert_equal "image/x-custom", dummy.avatar_content_type
+      assert_equal "image/x-custom", dummy.avatar.queued_for_write[:original].content_type
+    end
+
+    it "keeps the type Paperclip detected when the detector returns nil" do
+      rebuild_model content_type_detector: stub(new: stub(detect: nil))
+      dummy = Dummy.new
+      dummy.avatar = @file
+
+      assert_equal "image/png", dummy.avatar_content_type
+      assert_equal "image/png", dummy.avatar.queued_for_write[:original].content_type
+    end
+
+    it "uses the detected type for an original that a processor replaced" do
+      class Paperclip::Test < Paperclip::Processor; end
+      processed = Tempfile.new(["processed", ".png"])
+      FileUtils.cp(@file.path, processed.path)
+      Paperclip::Test.stubs(:make).returns(processed)
+      rebuild_model styles: { original: { processors: [:test] } },
+                    content_type_detector: stub(new: stub(detect: "image/x-custom"))
+      dummy = Dummy.new
+      dummy.avatar = @file
+
+      assert_equal "image/x-custom", dummy.avatar_content_type
+      assert_equal "image/x-custom", dummy.avatar.queued_for_write[:original].content_type
+    end
+  end
+
   context "Attachment with strange letters" do
     before do
       rebuild_model

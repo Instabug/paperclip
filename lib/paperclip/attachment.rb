@@ -67,6 +67,7 @@ module Paperclip
     # +interpolator+ - the object used to interpolate filenames and URLs. Defaults to Paperclip::Interpolations
     # +url_generator+ - the object used to generate URLs, using the interpolator. Defaults to Paperclip::UrlGenerator
     # +escape_url+ - Perform URI escaping to URLs. Defaults to true
+    # +content_type_detector+ - a class whose #new(path).detect returns the content type to store and upload, or nil to keep the detected one
     def initialize(name, instance, options = {})
       @name              = name
       @instance          = instance
@@ -425,9 +426,18 @@ module Paperclip
 
     def assign_attributes
       @queued_for_write[:original] = @file
+      apply_content_type_detector(@file)
       assign_file_information
       assign_fingerprint(@file.fingerprint)
       assign_timestamps
+    end
+
+    def apply_content_type_detector(file)
+      detector = @options[:content_type_detector]
+
+      if detector
+        file.content_type = detector.new(file.path).detect.presence || file.content_type
+      end
     end
 
     def assign_file_information
@@ -527,6 +537,9 @@ module Paperclip
 
         unadapted_file = @queued_for_write[name]
         @queued_for_write[name] = Paperclip.io_adapters.for(@queued_for_write[name])
+        if name == :original
+          apply_content_type_detector(@queued_for_write[name])
+        end
         unadapted_file.close if unadapted_file.respond_to?(:close)
         @queued_for_write[name]
       rescue Paperclip::Error => e

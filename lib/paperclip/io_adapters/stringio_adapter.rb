@@ -5,8 +5,6 @@ module Paperclip
       cache_current_values
     end
 
-    attr_writer :content_type
-
     private
 
     def cache_current_values
